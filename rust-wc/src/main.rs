@@ -1,69 +1,89 @@
-#![allow(unused)]
-
 use std::env;
-use std::fs;
-use std::process;
-use std::io::{self, Read};
+use std::fs::File;
+use std::io::{self, BufReader, BufRead};
 
-fn read_from_stdin() -> (usize, u32, u32) {
-
-    let mut buffer = String::new();
-    io::stdin().read_to_string(&mut buffer).expect("Error on reading from stdin");
-    wc_default(&buffer)
-    
+struct FileInfo {
+    lines: u32,
+    words: u32,
+    characters: u32,
+    bytes: u32,
 }
 
-fn wc_default(content: &String) -> (usize, u32, u32) {
-    let bytes = content.len();
-    let mut lines: u32 = 0;
-    let mut words: u32 = 0;
-    let mut prev_word = char::MAX;
-    
+impl FileInfo {
+    fn new<R: BufRead>(reader: R) -> Result<Self, io::Error> {
+        let mut stats = FileInfo {
+            lines: 0,
+            words: 0,
+            characters: 0,
+            bytes: 0,
+        };
+        let mut prev_word = char::MAX;
 
-    for l in content.chars() {
-        if l.eq(&'\n') {
-            lines += 1;
-        }
-
-        if prev_word.is_ascii_whitespace() {
-            if l.is_alphanumeric() || l.is_ascii_punctuation() {
-                words += 1;
+        for ch in reader.bytes() {
+            stats.bytes += 1;
+            
+            let character = ch? as char;
+            if character.is_ascii() {
+                stats.characters += 1;
             }
+
+            if character.eq(&'\n') {
+                stats.lines += 1;
+            }
+
+            if prev_word.is_ascii_whitespace() {
+                if character.is_alphanumeric() || character.is_ascii_punctuation() {
+                    stats.words += 1;
+                }
+            }
+    
+            prev_word = character;
+
         }
 
-        prev_word = l;
+        if stats.bytes > 0 {
+            stats.words += 1;
+        }
+
+        Ok(stats)
     }
-
-    if content.len() > 0 {
-        words += 1;
+    
+    fn read_from_stdin() {
+        let stdfd = io::stdin();
+        let fd = BufReader::new(stdfd);
+        let filestats = FileInfo::new(fd).expect("error on reading stdin");
+        
+        println!("  {}", filestats);
     }
+}
 
-    (bytes, lines, words)
-
+impl std::fmt::Display for FileInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {} {}", self.lines, self.words, self.bytes)
+    
+    }
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    let mut bytes: usize = 0;
-    let mut lines: u32 = 0;
-    let mut words: u32 = 0;
 
     if args.len() < 2 {
-        (bytes, lines, words) = read_from_stdin();
         
-        process::exit(0);
+        FileInfo::read_from_stdin();
 
     } else {
+
         for i in 1..args.len() {
             let filename = &args[i];
-        
-            let content = fs::read_to_string(filename).expect("error reading file");
+            let fd = BufReader::new(File::open(filename).expect("error reading file"));
             
-            (bytes, lines, words) = wc_default(&content);
+            let filestats = FileInfo::new(fd).expect("error returning file stats");
+            
+            println!("  {} {}", filestats, filename);
+            
         }
 
     }
 
-    
 }
