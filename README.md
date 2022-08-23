@@ -1,4 +1,4 @@
-#rust-in-unix
+# rust-in-unix
 UNIX tools write in Rust lang
 
 **Credits to this repo's starter code, ideas and designs are mostly from doc.rust-lang.org
