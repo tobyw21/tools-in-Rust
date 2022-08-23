@@ -31,31 +31,13 @@ impl Process {
             fd_list.push(entry.file_name().to_str()?.to_string().parse::<usize>().ok()?);
         }
 
-        /*
-        match path_files {
-            Ok(files) => 
-            {
-                for entry in files {
-                    let entry = entry?;
-                    fd_list.push(entry.file_name().to_str()?.to_string().parse::<usize>().ok()?);
-                }
-            }
-            ,
-            Err(err) => 
-            {
-                eprintln!("Error: {} on reading path {}", err, path);
-                None
-            }
-        }
-        */
-
         Some(fd_list)
     }
 
     /// This function returns a list of (fdnumber, OpenFile) tuples, if file descriptor
     /// information is available (it returns None otherwise). The information is commonly
     /// unavailable if the process has already exited.
-    #[allow(unused)] // TODO: delete this line for Milestone 4
+    
     pub fn list_open_files(&self) -> Option<Vec<(usize, OpenFile)>> {
         let mut open_files = vec![];
         for fd in self.list_fds()? {
