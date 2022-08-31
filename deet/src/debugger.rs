@@ -38,6 +38,16 @@ impl Debugger {
                         // TODO (milestone 1): make the inferior run
                         // You may use self.inferior.as_mut().unwrap() to get a mutable reference
                         // to the Inferior object
+                        let inferior_object = self.inferior.as_mut().unwrap();
+                        let status = inferior_object.cont_exec();
+                        match status {
+                            Ok(stat) => {
+                                dbg!(stat);
+                                //println!("{}", stat);
+                            },
+                            Err(e) => eprintln!("{}", e),
+                        }
+
                     } else {
                         println!("Error starting subprocess");
                     }

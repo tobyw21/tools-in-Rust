@@ -3,7 +3,10 @@ use nix::sys::signal;
 use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
 use nix::unistd::Pid;
 use std::process::Child;
+use std::process::Command;
+use std::os::unix::process::CommandExt;
 
+#[derive(Debug)]
 pub enum Status {
     /// Indicates inferior stopped. Contains the signal that stopped the process, as well as the
     /// current instruction pointer that it is stopped at.
@@ -34,12 +37,41 @@ impl Inferior {
     /// Attempts to start a new inferior process. Returns Some(Inferior) if successful, or None if
     /// an error is encountered.
     pub fn new(target: &str, args: &Vec<String>) -> Option<Inferior> {
-        // TODO: implement me!
-        println!(
-            "Inferior::new not implemented! target={}, args={:?}",
-            target, args
-        );
-        None
+        
+        let mut command = Command::new(target);
+        unsafe {
+            command
+            .args(args)
+            .pre_exec(|| {
+                child_traceme()
+            });     
+            
+        };
+        
+        if let Ok(child_process) = command.spawn() {
+            let child_pid = nix::unistd::Pid::from_raw(child_process.id() as i32);
+            let pid_result = waitpid(child_pid, 
+                        Some(WaitPidFlag::WSTOPPED));
+            
+            match pid_result {
+                Ok(status) => 
+                    if status.eq(&WaitStatus::Stopped(child_pid, signal::SIGTRAP)) {
+                        Some(
+                            Inferior {
+                                child: child_process,
+                            }
+                        )
+
+                    } else {
+                        None
+                    },
+                Err(_e) => None,
+            }
+
+        } else {
+            None
+        }
+
     }
 
     /// Returns the pid of this inferior.
@@ -60,4 +92,10 @@ impl Inferior {
             other => panic!("waitpid returned unexpected status: {:?}", other),
         })
     }
+
+    pub fn cont_exec(&self) -> Result<Status, nix::Error> {
+        ptrace::cont(self.pid(), None)?;
+        self.wait(None)
+    }
+    
 }
