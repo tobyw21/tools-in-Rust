@@ -5,6 +5,7 @@ use nix::unistd::Pid;
 use std::process::Child;
 use std::process::Command;
 use std::os::unix::process::CommandExt;
+use std::fmt;
 
 #[derive(Debug)]
 pub enum Status {
@@ -18,6 +19,16 @@ pub enum Status {
     /// Indicates the inferior exited due to a signal. Contains the signal that killed the
     /// process.
     Signaled(signal::Signal),
+}
+
+impl fmt::Display for Status {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Self::Exited(code) => write!(f, "{}", code),
+            Self::Stopped(sig, eip) => write!(f, "{} {}", sig, eip),
+            Self::Signaled(sig) => write!(f, "{}", sig),
+        }
+    }
 }
 
 /// This function calls ptrace with PTRACE_TRACEME to enable debugging on a process. You should use

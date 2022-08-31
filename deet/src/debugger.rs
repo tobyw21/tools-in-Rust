@@ -42,8 +42,8 @@ impl Debugger {
                         let status = inferior_object.cont_exec();
                         match status {
                             Ok(stat) => {
-                                dbg!(stat);
-                                //println!("{}", stat);
+                                //dbg!(stat);
+                                println!("Child exited (status: {})", stat);
                             },
                             Err(e) => eprintln!("{}", e),
                         }
