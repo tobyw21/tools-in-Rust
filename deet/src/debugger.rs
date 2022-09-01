@@ -32,30 +32,54 @@ impl Debugger {
         loop {
             match self.get_next_command() {
                 DebuggerCommand::Run(args) => {
+                    self.to_kill();
+
                     if let Some(inferior) = Inferior::new(&self.target, &args) {
                         // Create the inferior
                         self.inferior = Some(inferior);
-                        // TODO (milestone 1): make the inferior run
-                        // You may use self.inferior.as_mut().unwrap() to get a mutable reference
-                        // to the Inferior object
                         let inferior_object = self.inferior.as_mut().unwrap();
                         let status = inferior_object.cont_exec();
                         match status {
-                            Ok(stat) => {
-                                //dbg!(stat);
-                                println!("Child exited (status: {})", stat);
+                            Ok(stat) => 
+                            {
+                                println!("Child {}", stat);
                             },
+                            
                             Err(e) => eprintln!("{}", e),
                         }
 
                     } else {
                         println!("Error starting subprocess");
                     }
-                }
+                },
+
+                DebuggerCommand::Cont => {
+                    if self.inferior.is_none() {
+                        eprintln!("No child process is running!");
+                        continue;
+                    }
+                    let result = self.inferior.as_mut().unwrap().cont_exec();
+                    match result {
+                        Ok(stat) => println!("Child {}", stat),
+                        Err(e) => eprintln!("{}", e),
+                    }
+                },
+
                 DebuggerCommand::Quit => {
+                    self.to_kill();
                     return;
                 }
             }
+        }
+    }
+
+    /// kill the current running inferior
+    fn to_kill(&mut self) {
+        if !self.inferior.is_none() {
+            let pid = self.inferior.as_mut().unwrap().pid();
+            self.inferior.as_mut().unwrap().kill_inferior();
+            println!("Killing running inferior (pid {})", pid);
+
         }
     }
 

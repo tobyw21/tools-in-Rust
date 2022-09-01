@@ -24,8 +24,8 @@ pub enum Status {
 impl fmt::Display for Status {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            Self::Exited(code) => write!(f, "{}", code),
-            Self::Stopped(sig, eip) => write!(f, "{} {}", sig, eip),
+            Self::Exited(code) => write!(f, "exited (status {})", code),
+            Self::Stopped(sig, eip) => write!(f, "stopped (signal {} at EIP {:x})", sig, eip),
             Self::Signaled(sig) => write!(f, "{}", sig),
         }
     }
@@ -107,6 +107,11 @@ impl Inferior {
     pub fn cont_exec(&self) -> Result<Status, nix::Error> {
         ptrace::cont(self.pid(), None)?;
         self.wait(None)
+    }
+
+    pub fn kill_inferior(&mut self) {
+        self.child.kill().ok();
+        self.child.wait().ok();
     }
     
 }
