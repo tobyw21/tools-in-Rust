@@ -1,4 +1,5 @@
 use nix::sys::ptrace;
+use nix::sys::ptrace::getregs;
 use nix::sys::signal;
 use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
 use nix::unistd::Pid;
@@ -6,6 +7,9 @@ use std::process::Child;
 use std::process::Command;
 use std::os::unix::process::CommandExt;
 use std::fmt;
+
+
+use crate::dwarf_data::DwarfData;
 
 #[derive(Debug)]
 pub enum Status {
@@ -25,7 +29,7 @@ impl fmt::Display for Status {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Self::Exited(code) => write!(f, "exited (status {})", code),
-            Self::Stopped(sig, eip) => write!(f, "stopped (signal {} at EIP {:x})", sig, eip),
+            Self::Stopped(sig, _eip) => write!(f, "stopped (signal {})", sig),
             Self::Signaled(sig) => write!(f, "{}", sig),
         }
     }
@@ -104,14 +108,25 @@ impl Inferior {
         })
     }
 
+    /// continue execute trapped process
     pub fn cont_exec(&self) -> Result<Status, nix::Error> {
         ptrace::cont(self.pid(), None)?;
         self.wait(None)
     }
 
+    /// kill the inferior and reap it
     pub fn kill_inferior(&mut self) {
         self.child.kill().ok();
         self.child.wait().ok();
+    }
+
+    pub fn print_backtrace(&self, debug_data: &mut DwarfData) -> Result<(), nix::Error> {
+
+        let register_value = getregs(self.pid()).ok().unwrap().rip as usize;
+        let line = debug_data.get_line_from_addr(register_value).unwrap();
+        let func_name = debug_data.get_function_from_addr(register_value).unwrap();
+        Ok(println!("{} ({})", func_name, line))
+
     }
     
 }

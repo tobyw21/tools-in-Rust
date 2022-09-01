@@ -1,5 +1,6 @@
 use crate::debugger_command::DebuggerCommand;
 use crate::inferior::Inferior;
+use crate::dwarf_data::{DwarfData, Error as DwarfError};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
@@ -8,12 +9,24 @@ pub struct Debugger {
     history_path: String,
     readline: Editor<()>,
     inferior: Option<Inferior>,
+    debug_data: DwarfData,
 }
 
 impl Debugger {
     /// Initializes the debugger.
     pub fn new(target: &str) -> Debugger {
-        // TODO (milestone 3): initialize the DwarfData
+        let debug_data = match DwarfData::from_file(target) {
+            Ok(val) => val,
+            Err(DwarfError::ErrorOpeningFile) => {
+                eprintln!("Could not open file {}", target);
+                std::process::exit(1);
+            },
+            Err(DwarfError::DwarfFormatError(err)) => {
+                eprintln!("Could not debugging symbols from {}: {:?}", target, err);
+                std::process::exit(1);
+            }
+
+        };
 
         let history_path = format!("{}/.deet_history", std::env::var("HOME").unwrap());
         let mut readline = Editor::<()>::new();
@@ -25,6 +38,7 @@ impl Debugger {
             history_path,
             readline,
             inferior: None,
+            debug_data,
         }
     }
 
@@ -61,6 +75,22 @@ impl Debugger {
                     let result = self.inferior.as_mut().unwrap().cont_exec();
                     match result {
                         Ok(stat) => println!("Child {}", stat),
+                        Err(e) => eprintln!("{}", e),
+                    }
+                },
+
+                DebuggerCommand::Back => {
+                    if self.inferior.is_none() {
+                        eprintln!("No child process is running!");
+                        continue;
+                    }
+                    
+                    let debug_data_ref = &mut self.debug_data;
+
+                    let result = self.inferior.as_mut().unwrap()
+                        .print_backtrace(debug_data_ref);
+                    match result {
+                        Ok(()) => (),
                         Err(e) => eprintln!("{}", e),
                     }
                 },
