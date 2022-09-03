@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::debugger_command::DebuggerCommand;
 use crate::dwarf_data::{DwarfData, Error as DwarfError};
 use crate::inferior::Inferior;
@@ -12,10 +14,15 @@ fn parse_address(addr: &str) -> Option<usize> {
     } else {
         &addr
     };
-    
+
     usize::from_str_radix(addr_without0x, 16).ok()
 }
 
+#[derive(Clone)]
+pub struct BreakPoint {
+    pub addr: usize,
+    pub orig_byte: u8,
+}
 
 pub struct Debugger {
     target: String,
@@ -24,6 +31,7 @@ pub struct Debugger {
     inferior: Option<Inferior>,
     debug_data: DwarfData,
     breakpoints: Vec<usize>,
+    breakpoint_set: HashMap<usize, BreakPoint>,
 }
 
 impl Debugger {
@@ -46,6 +54,7 @@ impl Debugger {
         // Attempt to load history from ~/.deet_history if it exists
         let _ = readline.load_history(&history_path);
         let breakpoints = Vec::new();
+        let breakpoint_set: HashMap<usize, BreakPoint> = HashMap::new();
 
         Debugger {
             target: target.to_string(),
@@ -54,6 +63,7 @@ impl Debugger {
             inferior: None,
             debug_data,
             breakpoints,
+            breakpoint_set,
         }
     }
 
@@ -63,11 +73,16 @@ impl Debugger {
                 DebuggerCommand::Run(args) => {
                     self.to_kill();
 
-                    if let Some(inferior) = Inferior::new(&self.target, &args, &self.breakpoints) {
+                    if let Some(inferior) = Inferior::new(
+                        &self.target,
+                        &args,
+                        &self.breakpoints,
+                        &mut self.breakpoint_set,
+                    ) {
                         // Create the inferior
                         self.inferior = Some(inferior);
                         let inferior_object = self.inferior.as_mut().unwrap();
-                        let status = inferior_object.cont_exec();
+                        let status = inferior_object.cont_exec(&self.breakpoint_set);
                         match status {
                             Ok(stat) => {
                                 println!("Child {}", stat);
@@ -80,7 +95,7 @@ impl Debugger {
                                             .as_mut()
                                             .unwrap()
                                             .get_stop_line(debug_data_ref);
-                                        
+
                                         if line.is_some() {
                                             println!("Stopped at {}", line.unwrap());
                                         }
@@ -101,7 +116,12 @@ impl Debugger {
                         eprintln!("No child process is running!");
                         continue;
                     }
-                    let result = self.inferior.as_mut().unwrap().cont_exec();
+                    let result = self
+                        .inferior
+                        .as_mut()
+                        .unwrap()
+                        .cont_exec(&self.breakpoint_set);
+
                     match result {
                         Ok(stat) => println!("Child {}", stat),
                         Err(e) => eprintln!("{}", e),
@@ -130,28 +150,30 @@ impl Debugger {
                 DebuggerCommand::Break(arg) => {
                     let parsed_addr = parse_address(arg.as_str());
 
-                    let break_addr = if parsed_addr.is_some() {
-                        parsed_addr.unwrap()
-                    } else {
-                        eprintln!("Function {} not defined", arg);
+                    if parsed_addr.is_some() {
+                        self.breakpoints.push(parsed_addr.unwrap());
+
+                        let nbreakpoints = self.breakpoints.len() - 1;
+                        println!(
+                            "Set breakpoint {} at {:#x}",
+                            nbreakpoints,
+                            parsed_addr.unwrap()
+                        );
+
                         continue;
-                    };
-                    
-                    self.breakpoints.push(break_addr);
-                    let nbreakpoints = self.breakpoints.len() - 1;
-                    println!("Set breakpoint {} at {:#x}", nbreakpoints, break_addr);
+                    }
+
+                    println!("Function {} not defined!", arg);
                 }
 
-                DebuggerCommand::Info(arg) => {
-                    match arg.as_str() {
-                        "b" | "breakpoints" => {
-                            for (index, breakpoint) in self.breakpoints.iter().enumerate() {
-                                println!("#{} = {:#x}", index, breakpoint);
-                            }
-                        },
-                        _ => (),
+                DebuggerCommand::Info(arg) => match arg.as_str() {
+                    "b" | "breakpoints" => {
+                        for (index, breakpoint) in self.breakpoints.iter().enumerate() {
+                            println!("#{} = {:#x}", index, breakpoint);
+                        }
                     }
-                }
+                    _ => (),
+                },
 
                 DebuggerCommand::Quit => {
                     self.to_kill();

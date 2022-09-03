@@ -1,15 +1,18 @@
-use nix::sys::ptrace;
 use nix::sys::ptrace::getregs;
+use nix::sys::ptrace::{self, setregs};
 use nix::sys::signal;
 use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
 use nix::unistd::Pid;
-use std::process::Child;
-use std::process::Command;
-use std::os::unix::process::CommandExt;
+use std::collections::HashMap;
 use std::fmt;
 use std::mem::size_of;
+use std::os::unix::process::CommandExt;
+use std::process::Child;
+use std::process::Command;
 
-use crate::dwarf_data::{DwarfData, self};
+use crate::debugger::BreakPoint;
+
+use crate::dwarf_data::{self, DwarfData};
 
 #[derive(PartialEq)]
 pub enum Status {
@@ -55,28 +58,25 @@ pub struct Inferior {
 impl Inferior {
     /// Attempts to start a new inferior process. Returns Some(Inferior) if successful, or None if
     /// an error is encountered.
-    pub fn new(target: &str, args: &Vec<String>, breakset: &Vec<usize>) -> Option<Inferior> {
-        
+    pub fn new(
+        target: &str,
+        args: &Vec<String>,
+        breakset: &Vec<usize>,
+        breakpoint_set: &mut HashMap<usize, BreakPoint>,
+    ) -> Option<Inferior> {
         let mut command = Command::new(target);
         unsafe {
-            command
-            .args(args)
-            .pre_exec(|| {
-                child_traceme()
-            });     
-            
+            command.args(args).pre_exec(|| child_traceme());
         };
-        
+
         if let Ok(child_process) = command.spawn() {
             let child_pid = nix::unistd::Pid::from_raw(child_process.id() as i32);
-            
+
             // wait for SIGTRAP
-            let pid_result = waitpid(child_pid, 
-                        Some(WaitPidFlag::WSTOPPED));
-            
+            let pid_result = waitpid(child_pid, Some(WaitPidFlag::WSTOPPED));
 
             match pid_result {
-                Ok(status) => 
+                Ok(status) => {
                     if status.eq(&WaitStatus::Stopped(child_pid, signal::SIGTRAP)) {
                         // write to the process
                         // given address
@@ -87,25 +87,30 @@ impl Inferior {
                             child: child_process,
                         };
                         for breakpoint in breakset {
-                            let _ret_byte = final_inferior.write_byte(*breakpoint, 0xcc)
+                            let ret_byte = final_inferior
+                                .write_byte(*breakpoint, 0xcc)
                                 .expect("unable to write to break point");
+
+                            breakpoint_set.insert(
+                                *breakpoint,
+                                BreakPoint {
+                                    addr: *breakpoint,
+                                    orig_byte: ret_byte,
+                                },
+                            );
                         }
 
                         // return the new inferior created
-                        Some(
-                            final_inferior
-                        )
-
+                        Some(final_inferior)
                     } else {
                         None
-                    },
+                    }
+                }
                 Err(e) => panic!("Unexpected error {:?} on spawning process", e),
             }
-
         } else {
             None
         }
-
     }
 
     /// Returns the pid of this inferior.
@@ -128,7 +133,30 @@ impl Inferior {
     }
 
     /// continue execute trapped process
-    pub fn cont_exec(&self) -> Result<Status, nix::Error> {
+    pub fn cont_exec(
+        &mut self,
+        breakpoint_set: &HashMap<usize, BreakPoint>,
+    ) -> Result<Status, nix::Error> {
+        let mut regs = getregs(self.pid())?;
+        let rip_val = regs.rip as usize;
+
+        if let Some(bpoint) = breakpoint_set.get(&(rip_val - 1)) {
+            self.write_byte(rip_val - 1, bpoint.orig_byte).ok();
+            regs.rip = (rip_val - 1) as u64;
+
+            setregs(self.pid(), regs).ok();
+
+            ptrace::step(self.pid(), None).ok();
+
+            match self.wait(None).ok().unwrap() {
+                Status::Exited(code) => return Ok(Status::Exited(code)),
+                Status::Signaled(sig) => return Ok(Status::Signaled(sig)),
+                Status::Stopped(_sig, _reg) => {
+                    self.write_byte(rip_val - 1, 0xcc).ok().unwrap();
+                }
+            }
+        }
+
         ptrace::cont(self.pid(), None)?;
         self.wait(None)
     }
@@ -141,12 +169,10 @@ impl Inferior {
 
     /// print the backtrace of current debugging process
     pub fn print_backtrace(&self, debug_data: &mut DwarfData) -> Result<(), nix::Error> {
-
         let mut rip_value = getregs(self.pid()).ok().unwrap().rip as usize;
         let mut rbp_value = getregs(self.pid()).ok().unwrap().rbp as usize;
         let mut line = debug_data.get_line_from_addr(rip_value).unwrap();
         let mut func_name = debug_data.get_function_from_addr(rip_value).unwrap();
-        
 
         loop {
             println!("{} ({})", func_name, line);
@@ -159,15 +185,14 @@ impl Inferior {
             line = debug_data.get_line_from_addr(rip_value).unwrap();
             func_name = debug_data.get_function_from_addr(rip_value).unwrap();
         }
-        
-        Ok(())
 
+        Ok(())
     }
 
     pub fn get_stop_line(&self, debug_data: &mut DwarfData) -> Option<dwarf_data::Line> {
         let rip_value = getregs(self.pid()).ok().unwrap().rip as usize;
         let line = debug_data.get_line_from_addr(rip_value);
-        
+
         line
     }
 
@@ -187,5 +212,4 @@ impl Inferior {
 
         Ok(orig_byte as u8)
     }
-    
 }

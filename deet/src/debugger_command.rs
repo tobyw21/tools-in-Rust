@@ -24,7 +24,7 @@ impl DebuggerCommand {
             "b" | "break" => {
                 let arg = tokens[1].to_string();
                 Some(DebuggerCommand::Break(arg))
-            },
+            }
 
             "info" => {
                 let arg = tokens[1].to_string();
