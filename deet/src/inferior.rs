@@ -152,7 +152,7 @@ impl Inferior {
                 Status::Exited(code) => return Ok(Status::Exited(code)),
                 Status::Signaled(sig) => return Ok(Status::Signaled(sig)),
                 Status::Stopped(_sig, _reg) => {
-                    self.write_byte(rip_val - 1, 0xcc).ok().unwrap();
+                    self.write_byte(rip_val - 1, 0xcc).ok();
                 }
             }
         }
@@ -196,7 +196,7 @@ impl Inferior {
         line
     }
 
-    fn write_byte(&mut self, addr: usize, val: u8) -> Result<u8, nix::Error> {
+    pub fn write_byte(&mut self, addr: usize, val: u8) -> Result<u8, nix::Error> {
         let aligned_addr = align_addr_to_word(addr);
         let byte_offset = addr - aligned_addr;
         let word = ptrace::read(self.pid(), aligned_addr as ptrace::AddressType)? as u64;

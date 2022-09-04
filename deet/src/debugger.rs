@@ -148,22 +148,60 @@ impl Debugger {
                 }
 
                 DebuggerCommand::Break(arg) => {
-                    let parsed_addr = parse_address(arg.as_str());
-
-                    if parsed_addr.is_some() {
-                        self.breakpoints.push(parsed_addr.unwrap());
-
-                        let nbreakpoints = self.breakpoints.len() - 1;
-                        println!(
-                            "Set breakpoint {} at {:#x}",
-                            nbreakpoints,
-                            parsed_addr.unwrap()
-                        );
-
-                        continue;
+                    let breakpoint: Option<usize>;
+                    if arg.starts_with("*") {
+                        if let Some(parsed_addr) = parse_address(&arg) {
+                            breakpoint = Some(parsed_addr);
+                        } else {
+                            breakpoint = None;
+                        }
+                    } else if let Some(line) = usize::from_str_radix(&arg, 10).ok() {
+                        if let Some(line_addr) = self.debug_data.get_addr_for_line(None, line) {
+                            breakpoint = Some(line_addr);
+                        } else {
+                            breakpoint = None;
+                        }
+                    } else if let Some(func_addr) =
+                        self.debug_data.get_addr_for_function(None, &arg)
+                    {
+                        breakpoint = Some(func_addr);
+                    } else {
+                        breakpoint = None;
                     }
 
-                    println!("Function {} not defined!", arg);
+                    match breakpoint {
+                        Some(bp) => {
+                            if !self.breakpoints.contains(&bp) {
+                                if self.inferior.is_some() {
+                                    if let Some(orig_byte) =
+                                        self.inferior.as_mut().unwrap().write_byte(bp, 0xcc).ok()
+                                    {
+                                        self.breakpoints.push(bp);
+
+                                        let nbreakpoints = self.breakpoints.len() - 1;
+                                        println!("Set breakpoint {} at {:#x}", nbreakpoints, bp);
+
+                                        self.breakpoint_set.insert(
+                                            bp,
+                                            BreakPoint {
+                                                addr: bp,
+                                                orig_byte,
+                                            },
+                                        );
+                                    }
+                                } else {
+                                    self.breakpoints.push(bp);
+
+                                    let nbreakpoints = self.breakpoints.len() - 1;
+                                    println!("Set breakpoint {} at {:#x}", nbreakpoints, bp);
+                                }
+                            } else {
+                                println!("Breakpoint {:#x} exists", bp);
+                            }
+                        }
+
+                        None => println!("Function {} not defined!", arg),
+                    }
                 }
 
                 DebuggerCommand::Info(arg) => match arg.as_str() {
