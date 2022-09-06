@@ -8,8 +8,19 @@ How to build
 =============
 `cargo build --release`
 
+How to Run
+=============
+`cargo run <path_to_file>`
+
 tests
 ============
 -- test not yet implemented
 
- 
+TODO
+============
+- add stepping, aka next
+- add select frame
+- add print local, global variable
+- add disassemble
+- add attach, detach
+- add x
