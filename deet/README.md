@@ -24,3 +24,11 @@ TODO
 - add disassemble
 - add attach, detach
 - add x
+
+Patches
+============
+2022 Sept 9
+    - now `disassemble` works in Intel format! try `disassemble` command
+    need to fix
+        - disassemble on func/addr
+        - fix the disassemble general layouts 
