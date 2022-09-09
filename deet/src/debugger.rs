@@ -7,6 +7,7 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
 use crate::inferior::Status;
+use crate::disassembler::DisassembleObject;
 
 fn parse_address(addr: &str) -> Option<usize> {
     let addr_without0x = if addr.to_lowercase().starts_with("*0x") {
@@ -32,6 +33,7 @@ pub struct Debugger {
     debug_data: DwarfData,
     breakpoints: Vec<usize>,
     breakpoint_set: HashMap<usize, BreakPoint>,
+    disassemble: DisassembleObject,
 }
 
 impl Debugger {
@@ -56,6 +58,8 @@ impl Debugger {
         let breakpoints = Vec::new();
         let breakpoint_set: HashMap<usize, BreakPoint> = HashMap::new();
 
+        // create disassemble object
+        let disassemble = DisassembleObject::new(target);
         Debugger {
             target: target.to_string(),
             history_path,
@@ -64,6 +68,7 @@ impl Debugger {
             debug_data,
             breakpoints,
             breakpoint_set,
+            disassemble,
         }
     }
 
@@ -212,6 +217,13 @@ impl Debugger {
                     }
                     _ => (),
                 },
+
+                #[allow(unused_variables)]
+                DebuggerCommand::Disassemble() => {
+                    // arg is where user want it to be disassembled
+                    // not yet implmented
+                    self.disassemble.disassemble();
+                }
 
                 DebuggerCommand::Quit => {
                     self.to_kill();

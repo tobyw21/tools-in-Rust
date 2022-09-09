@@ -13,6 +13,7 @@ nix = "0.17.0"
 libc = "0.2.68"
 rustyline = "6.1.2"
 gimli = { git = "https://github.com/gimli-rs/gimli", rev = "ad23cdb2", default-features = false, features = ["read"] }
-object = { version = "0.17", default-features = false, features = ["read"] }
+object = { version = "0.17.0", default-features = true, features = ["read"] }
 memmap = "0.7"
 addr2line = "0.11.0"
+capstone = "0.11.0"

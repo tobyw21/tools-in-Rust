@@ -3,6 +3,7 @@ mod debugger_command;
 mod dwarf_data;
 mod gimli_wrapper;
 mod inferior;
+mod disassembler;
 
 use crate::debugger::Debugger;
 use nix::sys::signal::{signal, SigHandler, Signal};

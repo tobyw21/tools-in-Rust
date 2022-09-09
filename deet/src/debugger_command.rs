@@ -5,6 +5,7 @@ pub enum DebuggerCommand {
     Break(String),
     Info(String),
     Run(Vec<String>),
+    Disassemble(),
 }
 
 impl DebuggerCommand {
@@ -24,6 +25,11 @@ impl DebuggerCommand {
             "b" | "break" => {
                 let arg = tokens[1].to_string();
                 Some(DebuggerCommand::Break(arg))
+            }
+
+            "disassemble" => {
+                //let arg = tokens[1].to_string();
+                Some(DebuggerCommand::Disassemble())
             }
 
             "info" => {
