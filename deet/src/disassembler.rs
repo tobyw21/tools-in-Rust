@@ -30,7 +30,10 @@ impl DisassembleObject {
     pub fn disassemble(&self) {
         let objfile = object::File::parse(&*self.filedump).expect("error on parsing file");
         if let Some(section) = objfile.section_by_name(".text") {
-            let insns = self.dis_engine.disasm_all(&section.data(), 0x0)
+            
+            
+            let base_address = section.address();
+            let insns = self.dis_engine.disasm_all(&section.data(), base_address)
                 .expect("Failed to disassemble");
             
             for instruction in insns.as_ref() {
