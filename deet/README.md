@@ -1,6 +1,6 @@
 # Deet, deet
 
-Credits to Standford University, reberhardt7@gmail.com provided starter code,
+Credits to Stanford University, reberhardt7@gmail.com provided starter code,
 wrote the wrapper for gmili dwarf debugging format. The program deet is a `gdb`
 format debugger rewrite in `Rust`
 
