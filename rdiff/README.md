@@ -1,6 +1,6 @@
-# Rdiff, rdiff
+# Rdiff
 
-a basic version of unix `diff` implemented in `Rust` 
+a simple version of unix `diff` implemented in `Rust` 
 
 To build
 =========

@@ -1,6 +1,6 @@
-# Rwc, rwc
+# rwc
 
-a basic version of unix `wc` implemented in `Rust` 
+a simple version of unix `wc` implemented in `Rust` 
 
 To build
 ===========
@@ -8,8 +8,8 @@ To build
 
 To test
 ===========
-    - tests not yet done
-`cargo test <which function to test>`
+tests not yet done
+
 
 To run
 ============
