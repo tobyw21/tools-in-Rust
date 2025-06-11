@@ -1,10 +1,10 @@
 # rust-in-unix
 UNIX tools write in Rust lang
 
-**Credits to this repo's starter code, ideas and designs are mostly from doc.rust-lang.org
-(the Rust book) and Stanford Univerisity CS110L (Safety in Systems Programming)**
+**Credits to this repo's starter code, ideas and designs are from
+Stanford University CS110L (Safety in Systems Programming)**
 
-According the reference above, I derive my own version of tools, the target is
+According the reference above, I implement and modify those projects, the target is
 to implement memory efficient, robust and safe system tools and learn the
 safety programming semantics from the design of language Rust. eg the rust-wc 
 runtime efficiency is approximately the same as the one from coreutils (wc implemented in C)
